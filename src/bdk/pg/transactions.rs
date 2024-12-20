@@ -1,4 +1,4 @@
-use bdk::{bitcoin::Txid, LocalUtxo, TransactionDetails};
+use bdk::{bitcoin::Txid, LocalOutput, TransactionDetails};
 use sqlx::{PgPool, Postgres, QueryBuilder, Transaction};
 use tracing::instrument;
 
@@ -13,16 +13,16 @@ pub struct UnsyncedTransaction {
     pub vsize: u64,
     pub total_utxo_in_sats: Satoshis,
     pub fee_sats: Satoshis,
-    pub inputs: Vec<(LocalUtxo, u32)>,
-    pub outputs: Vec<(LocalUtxo, u32)>,
+    pub inputs: Vec<(LocalOutput, u32)>,
+    pub outputs: Vec<(LocalOutput, u32)>,
 }
 
 pub struct ConfirmedSpendTransaction {
     #[allow(dead_code)]
     pub tx_id: bitcoin::Txid,
     pub confirmation_time: bitcoin::BlockTime,
-    pub inputs: Vec<LocalUtxo>,
-    pub outputs: Vec<LocalUtxo>,
+    pub inputs: Vec<LocalOutput>,
+    pub outputs: Vec<LocalOutput>,
 }
 
 pub struct Transactions {
@@ -165,7 +165,7 @@ impl Transactions {
         let mut fee_sats = Satoshis::ZERO;
 
         for row in rows {
-            let utxo: LocalUtxo = serde_json::from_value(row.utxo_json)?;
+            let utxo: LocalOutput = serde_json::from_value(row.utxo_json)?;
             if row.is_tx_output {
                 outputs.push((utxo, row.path as u32));
             } else {
@@ -238,7 +238,7 @@ impl Transactions {
         let mut confirmation_time = None;
 
         for row in rows {
-            let utxo: LocalUtxo = serde_json::from_value(row.utxo_json)?;
+            let utxo: LocalOutput = serde_json::from_value(row.utxo_json)?;
             if row.is_tx_output {
                 outputs.push(utxo);
             } else {

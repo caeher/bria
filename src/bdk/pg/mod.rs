@@ -9,7 +9,7 @@ mod utxos;
 use bdk::{
     bitcoin::{blockdata::transaction::OutPoint, Script, ScriptBuf, Transaction, Txid},
     database::{BatchDatabase, BatchOperations, Database, SyncTime},
-    KeychainKind, LocalUtxo, TransactionDetails,
+    KeychainKind, LocalOutput, TransactionDetails,
 };
 use sqlx::PgPool;
 use tokio::runtime::Handle;
@@ -31,7 +31,7 @@ pub struct SqlxWalletDb {
     rt: Handle,
     pool: PgPool,
     keychain_id: KeychainId,
-    utxos: Option<Vec<LocalUtxo>>,
+    utxos: Option<Vec<LocalOutput>>,
     cached_spks: Arc<Mutex<HashMap<ScriptBuf, (KeychainKind, u32)>>>,
     addresses: HashMap<ScriptBuf, (KeychainKind, u32)>,
     cached_txs: Arc<Mutex<HashMap<Txid, TransactionDetails>>>,
@@ -89,7 +89,7 @@ impl BatchOperations for SqlxWalletDb {
         Ok(())
     }
 
-    fn set_utxo(&mut self, utxo: &LocalUtxo) -> Result<(), anyhow::Error> {
+    fn set_utxo(&mut self, utxo: &LocalOutput) -> Result<(), anyhow::Error> {
         if self.utxos.is_none() {
             self.utxos = Some(Vec::new());
         }
@@ -133,7 +133,7 @@ impl BatchOperations for SqlxWalletDb {
     ) -> Result<Option<(KeychainKind, u32)>, anyhow::Error> {
         unimplemented!()
     }
-    fn del_utxo(&mut self, outpoint: &OutPoint) -> Result<Option<LocalUtxo>, anyhow::Error> {
+    fn del_utxo(&mut self, outpoint: &OutPoint) -> Result<Option<LocalOutput>, anyhow::Error> {
         self.rt.block_on(async {
             Utxos::new(self.keychain_id, self.pool.clone())
                 .delete(outpoint)
@@ -190,7 +190,7 @@ impl Database for SqlxWalletDb {
             Ok(scripts)
         })
     }
-    fn iter_utxos(&self) -> Result<Vec<LocalUtxo>, anyhow::Error> {
+    fn iter_utxos(&self) -> Result<Vec<LocalOutput>, anyhow::Error> {
         self.rt.block_on(async {
             Utxos::new(self.keychain_id, self.pool.clone())
                 .list_local_utxos()
@@ -243,7 +243,7 @@ impl Database for SqlxWalletDb {
             Ok(None)
         }
     }
-    fn get_utxo(&self, outpoint: &OutPoint) -> Result<Option<LocalUtxo>, anyhow::Error> {
+    fn get_utxo(&self, outpoint: &OutPoint) -> Result<Option<LocalOutput>, anyhow::Error> {
         self.rt.block_on(async {
             Utxos::new(self.keychain_id, self.pool.clone())
                 .find(outpoint)

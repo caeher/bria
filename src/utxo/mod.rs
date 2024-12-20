@@ -4,7 +4,7 @@ mod entity;
 pub mod error;
 mod repo;
 
-use bdk::{wallet::AddressInfo, LocalUtxo};
+use bdk::{wallet::AddressInfo, LocalOutput};
 use sqlx::{Pool, Postgres, Transaction};
 use tracing::instrument;
 
@@ -38,7 +38,7 @@ impl Utxos {
         wallet_id: WalletId,
         keychain_id: KeychainId,
         address: &AddressInfo,
-        utxo: &LocalUtxo,
+        utxo: &LocalOutput,
         origin_tx_fee: Satoshis,
         origin_tx_vbytes: u64,
         self_pay: bool,
@@ -91,7 +91,7 @@ impl Utxos {
         keychain_id: KeychainId,
         tx_id: LedgerTransactionId,
         inputs_iter: impl Iterator<Item = &OutPoint>,
-        change_utxos: &Vec<(&LocalUtxo, AddressInfo)>,
+        change_utxos: &Vec<(&LocalOutput, AddressInfo)>,
         batch: Option<(BatchId, PayoutQueueId)>,
         tx_fee: Satoshis,
         tx_vbytes: u64,
@@ -160,7 +160,7 @@ impl Utxos {
         tx: &mut Transaction<'_, Postgres>,
         keychain_id: KeychainId,
         inputs: impl Iterator<Item = &OutPoint>,
-        change_utxo: Option<LocalUtxo>,
+        change_utxo: Option<LocalOutput>,
         block_height: u32,
     ) -> Result<Option<(LedgerTransactionId, LedgerTransactionId, bool)>, UtxoError> {
         let (spend_tx_id, change_spent) = if let Some(utxo) = change_utxo {
