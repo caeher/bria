@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use sqlx::PgPool;
 use tracing::instrument;
 use uuid::Uuid;
@@ -23,7 +24,7 @@ impl DescriptorChecksums {
         &self,
         keychain: impl Into<BdkKeychainKind>,
         script_bytes: &[u8],
-    ) -> Result<(), bdk::Error> {
+    ) -> Result<(), anyhow::Error> {
         let kind = keychain.into();
         let record = sqlx::query!(
             r#"SELECT script_bytes
@@ -33,12 +34,12 @@ impl DescriptorChecksums {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| bdk::Error::Generic(e.to_string()))?;
+        .map_err(|e|  anyhow!(e.to_string()))?;
         if let Some(record) = record.first() {
             if script_bytes == record.script_bytes {
                 Ok(())
             } else {
-                Err(bdk::Error::ChecksumMismatch)
+                Err(anyhow!("Descriptor checksum mismatch"))
             }
         } else {
             sqlx::query!(
@@ -50,7 +51,7 @@ impl DescriptorChecksums {
             )
             .execute(&self.pool)
             .await
-            .map_err(|e| bdk::Error::Generic(e.to_string()))?;
+            .map_err(|e| anyhow!(e.to_string()))?;
             Ok(())
         }
     }

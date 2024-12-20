@@ -16,7 +16,7 @@ impl Indexes {
     }
 
     #[instrument(name = "bdk.indexes.increment", skip_all)]
-    pub async fn increment(&self, keychain: impl Into<BdkKeychainKind>) -> Result<u32, bdk::Error> {
+    pub async fn increment(&self, keychain: impl Into<BdkKeychainKind>) -> Result<u32, anyhow::Error> {
         let kind = keychain.into();
         let result = sqlx::query!(
             r#"
@@ -32,7 +32,7 @@ impl Indexes {
         )
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| bdk::Error::Generic(e.to_string()))?;
+        .map_err(|e| anyhow::Error::Generic(e.to_string()))?;
 
         let new_idx = result.index;
         Ok(new_idx as u32)
@@ -43,7 +43,7 @@ impl Indexes {
         &self,
         keychain: impl Into<BdkKeychainKind>,
         idx: u32,
-    ) -> Result<(), bdk::Error> {
+    ) -> Result<(), anyhow::Error> {
         let kind = keychain.into();
         sqlx::query!(
             r#"INSERT INTO bdk_indexes (keychain_id, keychain_kind, index)
@@ -57,7 +57,7 @@ impl Indexes {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| bdk::Error::Generic(e.to_string()))?;
+        .map_err(|e| anyhow!(e.to_string()))?;
         Ok(())
     }
 
@@ -65,7 +65,7 @@ impl Indexes {
     pub async fn get_latest(
         &self,
         keychain: impl Into<BdkKeychainKind>,
-    ) -> Result<Option<u32>, bdk::Error> {
+    ) -> Result<Option<u32>, anyhow::Error> {
         let kind = keychain.into();
         let rows = sqlx::query!(
             r#"SELECT index FROM bdk_indexes WHERE keychain_id = $1 AND keychain_kind = $2"#,
@@ -74,7 +74,7 @@ impl Indexes {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| bdk::Error::Generic(e.to_string()))?;
+        .map_err(|e| anyhow!(e.to_string()))?;
         Ok(rows.first().map(|row| row.index as u32))
     }
 }

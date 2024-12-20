@@ -20,7 +20,7 @@ impl ScriptPubkeys {
     pub async fn persist_all(
         &self,
         keys: Vec<(BdkKeychainKind, u32, ScriptBuf)>,
-    ) -> Result<(), bdk::Error> {
+    ) -> Result<(), anyhow::Error> {
         const BATCH_SIZE: usize = 5000;
         let chunks = keys.chunks(BATCH_SIZE);
         for chunk in chunks {
@@ -43,7 +43,7 @@ impl ScriptPubkeys {
             query
                 .execute(&self.pool)
                 .await
-                .map_err(|e| bdk::Error::Generic(e.to_string()))?;
+                .map_err(|e| anyhow!(e.to_string()))?;
         }
         Ok(())
     }
@@ -53,7 +53,7 @@ impl ScriptPubkeys {
         &self,
         keychain: impl Into<BdkKeychainKind>,
         path: u32,
-    ) -> Result<Option<ScriptBuf>, bdk::Error> {
+    ) -> Result<Option<ScriptBuf>, anyhow::Error> {
         let kind = keychain.into();
         let rows = sqlx::query!(
             r#"SELECT script FROM bdk_script_pubkeys
@@ -64,7 +64,7 @@ impl ScriptPubkeys {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| bdk::Error::Generic(e.to_string()))?;
+        .map_err(|e| anyhow!(e.to_string()))?;
         Ok(rows
             .into_iter()
             .next()
@@ -74,7 +74,7 @@ impl ScriptPubkeys {
     #[instrument(name = "bdk.script_pubkeys.load_all", skip_all)]
     pub async fn load_all(
         &self,
-    ) -> Result<HashMap<ScriptBuf, (bdk::KeychainKind, u32)>, bdk::Error> {
+    ) -> Result<HashMap<ScriptBuf, (bdk::KeychainKind, u32)>, anyhow::Error> {
         let rows = sqlx::query!(
             r#"SELECT script, keychain_kind as "keychain_kind: BdkKeychainKind", path FROM bdk_script_pubkeys
             WHERE keychain_id = $1"#,
@@ -82,7 +82,7 @@ impl ScriptPubkeys {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| bdk::Error::Generic(e.to_string()))?;
+        .map_err(|e| anyhow!(e.to_string()))?;
         let mut ret = HashMap::new();
         for row in rows {
             ret.insert(
@@ -97,7 +97,7 @@ impl ScriptPubkeys {
     pub async fn find_path(
         &self,
         script: &ScriptBuf,
-    ) -> Result<Option<(BdkKeychainKind, u32)>, bdk::Error> {
+    ) -> Result<Option<(BdkKeychainKind, u32)>, anyhow::Error> {
         let rows = sqlx::query!(
             r#"SELECT keychain_kind as "keychain_kind: BdkKeychainKind", path FROM bdk_script_pubkeys
             WHERE keychain_id = $1 AND script_hex = ENCODE($2, 'hex')"#,
@@ -106,7 +106,7 @@ impl ScriptPubkeys {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| bdk::Error::Generic(e.to_string()))?;
+        .map_err(|e| anyhow!(e.to_string()))?;
         if let Some(row) = rows.into_iter().next() {
             Ok(Some((row.keychain_kind, row.path as u32)))
         } else {
@@ -118,7 +118,7 @@ impl ScriptPubkeys {
     pub async fn list_scripts(
         &self,
         keychain: Option<impl Into<BdkKeychainKind>>,
-    ) -> Result<Vec<ScriptBuf>, bdk::Error> {
+    ) -> Result<Vec<ScriptBuf>, anyhow::Error> {
         let kind = keychain.map(|k| k.into());
         let rows = sqlx::query!(
             r#"SELECT script, keychain_kind as "keychain_kind: BdkKeychainKind" FROM bdk_script_pubkeys
@@ -127,7 +127,7 @@ impl ScriptPubkeys {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| bdk::Error::Generic(e.to_string()))?;
+        .map_err(|e| anyhow!(e.to_string()))?;
         Ok(rows
             .into_iter()
             .filter_map(|row| {

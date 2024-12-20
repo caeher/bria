@@ -36,7 +36,7 @@ impl Transactions {
     }
 
     #[instrument(name = "bdk.transactions.persist", skip_all)]
-    pub async fn persist_all(&self, txs: Vec<TransactionDetails>) -> Result<(), bdk::Error> {
+    pub async fn persist_all(&self, txs: Vec<TransactionDetails>) -> Result<(), anyhow::Error> {
         const BATCH_SIZE: usize = 5000;
         let batches = txs.chunks(BATCH_SIZE);
 
@@ -61,14 +61,14 @@ impl Transactions {
             query
                 .execute(&self.pool)
                 .await
-                .map_err(|e| bdk::Error::Generic(e.to_string()))?;
+                .map_err(|e| anyhow!(e.to_string()))?;
         }
 
         Ok(())
     }
 
     #[instrument(name = "bdk.transactions.delete", skip_all)]
-    pub async fn delete(&self, tx_id: &Txid) -> Result<Option<TransactionDetails>, bdk::Error> {
+    pub async fn delete(&self, tx_id: &Txid) -> Result<Option<TransactionDetails>, anyhow::Error> {
         let tx = sqlx::query!(
             r#"UPDATE bdk_transactions
                  SET deleted_at = NOW()
@@ -79,7 +79,7 @@ impl Transactions {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| bdk::Error::Generic(e.to_string()))?;
+        .map_err(|e| anyhow!(e.to_string()))?;
 
         Ok(tx.map(|tx| {
             serde_json::from_value(tx.details_json).expect("could not deserialize tx details")
@@ -87,7 +87,7 @@ impl Transactions {
     }
 
     #[instrument(name = "bdk.transactions.find_by_id", skip_all)]
-    pub async fn find_by_id(&self, tx_id: &Txid) -> Result<Option<TransactionDetails>, bdk::Error> {
+    pub async fn find_by_id(&self, tx_id: &Txid) -> Result<Option<TransactionDetails>, anyhow::Error> {
         let tx = sqlx::query!(
             r#"
         SELECT details_json FROM bdk_transactions WHERE keychain_id = $1 AND tx_id = $2 AND deleted_at IS NULL"#,
@@ -96,12 +96,12 @@ impl Transactions {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| bdk::Error::Generic(e.to_string()))?;
+        .map_err(|e| anyhow!(e.to_string()))?;
         Ok(tx.map(|tx| serde_json::from_value(tx.details_json).unwrap()))
     }
 
     #[instrument(name = "bdk.transactions.load_all", skip(self), fields(n_rows))]
-    pub async fn load_all(&self) -> Result<HashMap<Txid, TransactionDetails>, bdk::Error> {
+    pub async fn load_all(&self) -> Result<HashMap<Txid, TransactionDetails>, anyhow::Error> {
         let txs = sqlx::query!(
             r#"
         SELECT details_json FROM bdk_transactions WHERE keychain_id = $1 AND deleted_at IS NULL"#,
@@ -109,7 +109,7 @@ impl Transactions {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| bdk::Error::Generic(e.to_string()))?;
+        .map_err(|e| anyhow!(e.to_string()))?;
         tracing::Span::current().record("n_rows", txs.len());
         Ok(txs
             .into_iter()

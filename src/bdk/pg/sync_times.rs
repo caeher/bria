@@ -16,7 +16,7 @@ impl SyncTimes {
     }
 
     #[instrument(name = "bdk.sync_times.persist", skip_all)]
-    pub async fn persist(&self, time: SyncTime) -> Result<(), bdk::Error> {
+    pub async fn persist(&self, time: SyncTime) -> Result<(), anyhow::Error> {
         sqlx::query!(
             r#"INSERT INTO bdk_sync_times (keychain_id, height, timestamp)
             VALUES ($1, $2, $3)
@@ -27,19 +27,19 @@ impl SyncTimes {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| bdk::Error::Generic(e.to_string()))?;
+        .map_err(|e| anyhow!(e.to_string()))?;
         Ok(())
     }
 
     #[instrument(name = "bdk.sync_times.get", skip_all)]
-    pub async fn get(&self) -> Result<Option<SyncTime>, bdk::Error> {
+    pub async fn get(&self) -> Result<Option<SyncTime>, anyhow::Error> {
         let sync_time = sqlx::query!(
             r#"SELECT height, timestamp FROM bdk_sync_times WHERE keychain_id = $1"#,
             Uuid::from(self.keychain_id),
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| bdk::Error::Generic(e.to_string()))?;
+        .map_err(|e| anyhow!(e.to_string()))?;
         Ok(sync_time.map(|time| SyncTime {
             block_time: bdk::BlockTime {
                 height: time.height as u32,

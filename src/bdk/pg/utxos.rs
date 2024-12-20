@@ -22,7 +22,7 @@ impl Utxos {
     }
 
     #[instrument(name = "bdk.utxos.persist_all", skip_all)]
-    pub async fn persist_all(&self, utxos: Vec<LocalUtxo>) -> Result<(), bdk::Error> {
+    pub async fn persist_all(&self, utxos: Vec<LocalUtxo>) -> Result<(), anyhow::Error> {
         const BATCH_SIZE: usize = 5000;
         let batches = utxos.chunks(BATCH_SIZE);
 
@@ -46,7 +46,7 @@ impl Utxos {
             query
                 .execute(&self.pool)
                 .await
-                .map_err(|e| bdk::Error::Generic(e.to_string()))?;
+                .map_err(|e| anyhow!(e.to_string()))?;
         }
 
         Ok(())
@@ -56,7 +56,7 @@ impl Utxos {
     pub async fn delete(
         &self,
         outpoint: &bitcoin::OutPoint,
-    ) -> Result<Option<LocalUtxo>, bdk::Error> {
+    ) -> Result<Option<LocalUtxo>, anyhow::Error> {
         let row = sqlx::query!(
             r#"UPDATE bdk_utxos SET deleted_at = NOW()
                  WHERE keychain_id = $1 AND tx_id = $2 AND vout = $3
@@ -67,7 +67,7 @@ impl Utxos {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| bdk::Error::Generic(e.to_string()))?;
+        .map_err(|e| anyhow!(e.to_string()))?;
 
         Ok(row.map(|row| {
             serde_json::from_value::<LocalUtxo>(row.utxo_json).expect("Could not deserialize utxo")
@@ -90,7 +90,7 @@ impl Utxos {
     }
 
     #[instrument(name = "bdk.utxos.find", skip_all)]
-    pub async fn find(&self, outpoint: &OutPoint) -> Result<Option<LocalUtxo>, bdk::Error> {
+    pub async fn find(&self, outpoint: &OutPoint) -> Result<Option<LocalUtxo>, anyhow::Error> {
         let utxo = sqlx::query!(
             r#"
             SELECT utxo_json
@@ -105,7 +105,7 @@ impl Utxos {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| bdk::Error::Generic(e.to_string()))?;
+        .map_err(|e| anyhow!(e.to_string()))?;
 
         Ok(utxo.map(|utxo| {
             serde_json::from_value(utxo.utxo_json).expect("Could not deserialize utxo")
@@ -113,14 +113,14 @@ impl Utxos {
     }
 
     #[instrument(name = "bdk.utxos.list_local_utxos", skip_all)]
-    pub async fn list_local_utxos(&self) -> Result<Vec<LocalUtxo>, bdk::Error> {
+    pub async fn list_local_utxos(&self) -> Result<Vec<LocalUtxo>, anyhow::Error> {
         let utxos = sqlx::query!(
             r#"SELECT utxo_json FROM bdk_utxos WHERE keychain_id = $1 AND deleted_at IS NULL"#,
             self.keychain_id as KeychainId,
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| bdk::Error::Generic(e.to_string()))?;
+        .map_err(|e| anyhow!(e.to_string()))?;
         Ok(utxos
             .into_iter()
             .map(|utxo| serde_json::from_value(utxo.utxo_json).expect("Could not deserialize utxo"))
