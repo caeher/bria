@@ -9,12 +9,12 @@ mod utxos;
 use bdk::{
     bitcoin::{blockdata::transaction::OutPoint, Script, ScriptBuf, Transaction, Txid},
     database::{BatchDatabase, BatchOperations, Database, SyncTime},
-    KeychainKind, LocalOutput, TransactionDetails,
+    KeychainKind, LocalOutput,
 };
 use sqlx::PgPool;
 use tokio::runtime::Handle;
 
-use crate::primitives::*;
+use crate::{primitives::*, bdk::types::TransactionDetails};
 use convert::BdkKeychainKind;
 use descriptor_checksum::DescriptorChecksums;
 use index::Indexes;

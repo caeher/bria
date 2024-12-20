@@ -1,15 +1,15 @@
-use bdk::{bitcoin::Txid, LocalOutput, TransactionDetails};
+use bdk::{bitcoin::Txid, LocalOutput};
 use sqlx::{PgPool, Postgres, QueryBuilder, Transaction};
 use tracing::instrument;
 
 use std::collections::HashMap;
 
-use crate::{bdk::error::BdkError, primitives::*};
+use crate::{bdk::error::BdkError, primitives::*, bdk::types::{TransactionDetails, BlockTime}};
 
 #[derive(Debug)]
 pub struct UnsyncedTransaction {
     pub tx_id: bitcoin::Txid,
-    pub confirmation_time: Option<bitcoin::BlockTime>,
+    pub confirmation_time: Option<BlockTime>,
     pub vsize: u64,
     pub total_utxo_in_sats: Satoshis,
     pub fee_sats: Satoshis,
@@ -20,7 +20,7 @@ pub struct UnsyncedTransaction {
 pub struct ConfirmedSpendTransaction {
     #[allow(dead_code)]
     pub tx_id: bitcoin::Txid,
-    pub confirmation_time: bitcoin::BlockTime,
+    pub confirmation_time: BlockTime,
     pub inputs: Vec<LocalOutput>,
     pub outputs: Vec<LocalOutput>,
 }

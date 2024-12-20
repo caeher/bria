@@ -91,8 +91,10 @@ pub mod bitcoin {
             psbt, Address as BdkAddress, Network,
         },
         descriptor::ExtendedDescriptor,
-        BlockTime, FeeRate, KeychainKind,
+        FeeRate, KeychainKind,
     };
+
+    pub use crate::bdk::types::BlockTime;
 
     pub mod pg {
         #[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type)]

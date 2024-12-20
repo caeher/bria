@@ -41,7 +41,7 @@ impl SyncTimes {
         .await
         .map_err(|e| anyhow!(e.to_string()))?;
         Ok(sync_time.map(|time| SyncTime {
-            block_time: bdk::BlockTime {
+            block_time: crate::bdk::types::BlockTime {
                 height: time.height as u32,
                 timestamp: time.timestamp as u64,
             },

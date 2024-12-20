@@ -1,4 +1,3 @@
-use bdk::BlockTime;
 use chrono::DateTime;
 use serde::{Deserialize, Serialize};
 use sqlx_ledger::{tx_template::*, JournalId, SqlxLedger, SqlxLedgerError};
@@ -8,6 +7,7 @@ use super::shared_meta::*;
 use crate::{
     ledger::{constants::*, error::LedgerError, WalletLedgerAccountIds},
     primitives::*,
+    bdk::types::BlockTime,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,14 +1,14 @@
-use bdk::{bitcoin::blockdata::transaction::OutPoint, LocalOutput, TransactionDetails};
+use bdk::{bitcoin::blockdata::transaction::OutPoint, LocalOutput};
 use sqlx::{PgPool, Postgres, QueryBuilder, Transaction};
 use tracing::instrument;
 use uuid::Uuid;
 
-use crate::{bdk::error::BdkError, primitives::*};
+use crate::{bdk::error::BdkError, primitives::*, bdk::types::{TransactionDetails, BlockTime}};
 
 pub struct ConfirmedIncomeUtxo {
     pub outpoint: bitcoin::OutPoint,
     pub spent: bool,
-    pub confirmation_time: bitcoin::BlockTime,
+    pub confirmation_time: BlockTime,
 }
 
 pub struct Utxos {

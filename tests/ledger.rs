@@ -1,11 +1,11 @@
 mod helpers;
 
-use bdk::BlockTime;
 use bria::{
     account::balance::*,
     ledger::*,
     primitives::{bitcoin::*, *},
     wallet::balance::WalletBalanceSummary,
+    bdk::types::BlockTime,
 };
 use rand::distributions::{Alphanumeric, DistString};
 
