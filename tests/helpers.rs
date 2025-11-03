@@ -14,9 +14,17 @@ use bdk::{
     miniscript::Segwitv0,
 };
 use bitcoincore_rpc::{Client as BitcoindClient, RpcApi};
-use bria::{admin::*, primitives::*, profile::*, xpub::*};
+use bria::{admin::*, job_svc::JobSvc, primitives::*, profile::*, xpub::*};
 use rand::distributions::{Alphanumeric, DistString};
 
+use bria::{
+    address::Addresses,
+    batch_inclusion::BatchInclusion,
+    ledger::Ledger,
+    outbox::{Augmenter, Outbox},
+    payout::Payouts,
+    payout_queue::PayoutQueues,
+};
 pub async fn init_pool() -> anyhow::Result<sqlx::PgPool> {
     let pg_host = std::env::var("PG_HOST").unwrap_or("localhost".to_string());
     let pg_con = format!("postgres://user:password@{pg_host}:5432/pg");
@@ -32,7 +40,17 @@ pub async fn create_test_account(pool: &sqlx::PgPool) -> anyhow::Result<Profile>
         "TEST_{}",
         Alphanumeric.sample_string(&mut rand::thread_rng(), 32)
     );
-    let app = AdminApp::new(pool.clone(), bitcoin::Network::Regtest);
+
+    let addresses = Addresses::new(pool);
+    let payouts = Payouts::new(pool);
+    let payout_queues = PayoutQueues::new(pool);
+    let batch_inclusion = BatchInclusion::new(pool.clone(), payout_queues);
+    let augmenter = Augmenter::new(&addresses, &payouts, &batch_inclusion);
+    let outbox = Outbox::init(pool, augmenter).await?;
+    let ledger = Ledger::init(&pool.clone()).await?;
+    let job_svc = JobSvc::init(pool.clone(), outbox, ledger).await?;
+
+    let app = AdminApp::new(pool.clone(), bitcoin::Network::Regtest, job_svc);
 
     let profile_key = app.create_account(name.clone()).await?;
     Ok(Profiles::new(pool).find_by_key(&profile_key.key).await?)

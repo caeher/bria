@@ -3,7 +3,6 @@ mod batch_signing;
 mod batch_wallet_accounting;
 mod config;
 mod executor;
-mod populate_outbox;
 mod sync_wallet;
 
 pub mod error;
@@ -16,9 +15,9 @@ use tracing::instrument;
 use uuid::{uuid, Uuid};
 
 use crate::{
-    account::*, address::Addresses, app::BlockchainConfig, batch::*, fees::FeesClient,
-    ledger::Ledger, outbox::*, payout::*, payout_queue::*, primitives::*, signing_session::*,
-    utxo::Utxos, wallet::*, xpub::*,
+    address::Addresses, app::BlockchainConfig, batch::*, fees::FeesClient, ledger::Ledger,
+    outbox::*, payout::*, payout_queue::*, primitives::*, signing_session::*, utxo::Utxos,
+    wallet::*, xpub::*,
 };
 use batch_broadcasting::BatchBroadcastingData;
 use batch_signing::BatchSigningData;
@@ -26,13 +25,11 @@ use batch_wallet_accounting::BatchWalletAccountingData;
 use error::JobError;
 pub use executor::JobExecutionError;
 use executor::JobExecutor;
-use populate_outbox::PopulateOutboxData;
 use process_payout_queue::ProcessPayoutQueueData;
 use sync_wallet::SyncWalletData;
 
 const SYNC_ALL_WALLETS_ID: Uuid = uuid!("00000000-0000-0000-0000-000000000001");
 const PROCESS_ALL_PAYOUT_QUEUES_ID: Uuid = uuid!("00000000-0000-0000-0000-000000000002");
-const RESPAWN_ALL_OUTBOX_ID: Uuid = uuid!("00000000-0000-0000-0000-000000000003");
 
 #[allow(clippy::too_many_arguments)]
 pub async fn start_job_runner(
@@ -61,8 +58,6 @@ pub async fn start_job_runner(
         batch_wallet_accounting,
         batch_signing,
         batch_broadcasting,
-        respawn_all_outbox_handlers,
-        populate_outbox,
     ]);
     registry.set_context(config);
     registry.set_context(blockchain_cfg);
@@ -136,49 +131,6 @@ async fn process_all_payout_queues(
         })
         .await?;
     spawn_process_all_payout_queues(current_job.pool(), delay).await?;
-    Ok(())
-}
-
-#[job(name = "populate_outbox")]
-async fn populate_outbox(
-    mut current_job: CurrentJob,
-    outbox: Outbox,
-    ledger: Ledger,
-) -> Result<(), JobError> {
-    JobExecutor::builder(&mut current_job)
-        .max_retry_delay(std::time::Duration::from_secs(20))
-        .build()
-        .expect("couldn't build JobExecutor")
-        .execute(|data| async move {
-            let data: PopulateOutboxData = data.expect("no PopulateOutboxData available");
-            let data = populate_outbox::execute(data, outbox, ledger).await?;
-            Ok::<_, JobError>(data)
-        })
-        .await?;
-    Ok(())
-}
-
-#[job(name = "respawn_all_outbox_handlers")]
-async fn respawn_all_outbox_handlers(
-    mut current_job: CurrentJob,
-    JobsConfig {
-        respawn_all_outbox_handlers_delay: delay,
-        ..
-    }: JobsConfig,
-) -> Result<(), JobError> {
-    let pool = current_job.pool().clone();
-    let accounts = Accounts::new(&pool);
-    JobExecutor::builder(&mut current_job)
-        .build()
-        .expect("couldn't build JobExecutor")
-        .execute(|_| async move {
-            for account in accounts.list().await? {
-                let _ = spawn_outbox_handler(&pool, account).await;
-            }
-            Ok::<(), JobError>(())
-        })
-        .await?;
-    spawn_respawn_all_outbox_handlers(current_job.pool(), delay).await?;
     Ok(())
 }
 
@@ -565,49 +517,6 @@ async fn spawn_batch_broadcasting(
             tx.commit().await?;
             Ok(())
         }
-    }
-}
-
-#[instrument(name = "job.spawn_outbox_handler", skip_all)]
-pub async fn spawn_outbox_handler(pool: &sqlx::PgPool, account: Account) -> Result<(), JobError> {
-    let data = PopulateOutboxData {
-        account_id: account.id,
-        journal_id: account.journal_id(),
-        tracing_data: crate::tracing::extract_tracing_data(),
-    };
-    match JobBuilder::new_with_id(Uuid::from(data.journal_id), "populate_outbox")
-        .set_channel_name("populate_outbox")
-        .set_channel_args(&format!("account_id:{}", data.account_id))
-        .set_json(&data)
-        .expect("Couldn't set json")
-        .spawn(pool)
-        .await
-    {
-        Err(sqlx::Error::Database(err)) if err.message().contains("duplicate key") => Ok(()),
-        Err(e) => {
-            crate::tracing::insert_error_fields(tracing::Level::ERROR, &e);
-            Err(e.into())
-        }
-        Ok(_) => Ok(()),
-    }
-}
-#[instrument(name = "job.spawn_respawn_all_outbox_handlers", skip_all, fields(error, error.level, error.message), err)]
-pub async fn spawn_respawn_all_outbox_handlers(
-    pool: &sqlx::PgPool,
-    duration: std::time::Duration,
-) -> Result<(), JobError> {
-    match JobBuilder::new_with_id(RESPAWN_ALL_OUTBOX_ID, "respawn_all_outbox_handlers")
-        .set_channel_name("respawn_all_outbox_handlers")
-        .set_delay(duration)
-        .spawn(pool)
-        .await
-    {
-        Err(sqlx::Error::Database(err)) if err.message().contains("duplicate key") => Ok(()),
-        Err(e) => {
-            crate::tracing::insert_error_fields(tracing::Level::ERROR, &e);
-            Err(e.into())
-        }
-        Ok(_) => Ok(()),
     }
 }
 

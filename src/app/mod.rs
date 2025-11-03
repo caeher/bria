@@ -17,6 +17,7 @@ use crate::{
     descriptor::*,
     fees::{self, *},
     job,
+    job_svc::*,
     ledger::*,
     outbox::*,
     payout::*,
@@ -32,6 +33,7 @@ use crate::{
 #[allow(dead_code)]
 pub struct App {
     _runner: JobRunnerHandle,
+    job_svc: JobSvc,
     outbox: Outbox,
     profiles: Profiles,
     xpubs: XPubs,
@@ -68,6 +70,9 @@ impl App {
         )
         .await?;
         let fees_client = FeesClient::new(config.fees.clone());
+
+        let job_svc = JobSvc::init(pool.clone(), outbox.clone(), ledger.clone()).await?;
+
         let runner = job::start_job_runner(
             &pool,
             outbox.clone(),
@@ -92,12 +97,9 @@ impl App {
             config.jobs.process_all_payout_queues_delay,
         )
         .await?;
-        Self::spawn_respawn_all_outbox_handlers(
-            pool.clone(),
-            config.jobs.respawn_all_outbox_handlers_delay,
-        )
-        .await?;
+
         let app = Self {
+            job_svc,
             outbox,
             profiles: Profiles::new(&pool),
             xpubs,
@@ -125,6 +127,10 @@ impl App {
 
     pub fn network(&self) -> bitcoin::Network {
         self.config.blockchain.network
+    }
+
+    pub fn job_svc(&self) -> &JobSvc {
+        &self.job_svc
     }
 
     #[instrument(name = "app.authenticate", skip_all, err)]
@@ -1075,29 +1081,6 @@ impl App {
                 let _ =
                     job::spawn_process_all_payout_queues(&pool, std::time::Duration::from_secs(1))
                         .await;
-                tokio::time::sleep(delay).await;
-            }
-        });
-        Ok(())
-    }
-
-    #[instrument(
-        name = "app.spawn_respawn_all_outbox_handlers",
-        level = "trace",
-        skip_all,
-        err
-    )]
-    async fn spawn_respawn_all_outbox_handlers(
-        pool: sqlx::PgPool,
-        delay: std::time::Duration,
-    ) -> Result<(), ApplicationError> {
-        tokio::spawn(async move {
-            loop {
-                let _ = job::spawn_respawn_all_outbox_handlers(
-                    &pool,
-                    std::time::Duration::from_secs(1),
-                )
-                .await;
                 tokio::time::sleep(delay).await;
             }
         });

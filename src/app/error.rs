@@ -9,6 +9,7 @@ use crate::{
     descriptor::error::DescriptorError,
     fees::error::FeeEstimationError,
     job::error::JobError,
+    job_svc::JobSvcError,
     ledger::error::LedgerError,
     outbox::error::OutboxError,
     payout::error::PayoutError,
@@ -43,6 +44,8 @@ pub enum ApplicationError {
     XPubError(#[from] XPubError),
     #[error("{0}")]
     JobError(#[from] JobError),
+    #[error("{0}")]
+    JobSvcError(#[from] JobSvcError),
     #[error("{0}")]
     OutboxError(#[from] OutboxError),
     #[error("{0}")]
